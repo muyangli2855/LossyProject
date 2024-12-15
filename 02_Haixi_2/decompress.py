@@ -1,137 +1,34 @@
-# decompress.py
-#!/usr/bin/env python
-
-import struct
-import wave
-import numpy as np
-from scipy.fftpack import idct
-
-def read_compressed(filename):
-    """Read the compressed file and parse the header."""
-
-    with open(filename, 'rb') as f:
-        data = f.read()
-
-    offset = 0
-    # block_size (int32)
-    block_size = struct.unpack_from('<i', data, offset)[0]
-    offset += 4
-    # pad (int32)
-    pad = struct.unpack_from('<i', data, offset)[0]
-    offset += 4
-    # quant_step (float64)
-    quant_step = struct.unpack_from('<d', data, offset)[0]
-    offset += 8
-    # nblocks (int32)
-    nblocks = struct.unpack_from('<i', data, offset)[0]
-    offset += 4
-    # padding_bits (int32)
-    padding_bits = struct.unpack_from('<i', data, offset)[0]
-    offset += 4
-    # huff_entries (int32)
-    huff_entries = struct.unpack_from('<i', data, offset)[0]
-    offset += 4
-
-    # Read Huffman table entries
-    # For each entry:
-    # symbol (int16)
-    # code_length (uint16)
-    # num_code_bytes (uint8)
-    # code_bytes (num_code_bytes)
-    symbol_to_code = {}
-    for _ in range(huff_entries):
-        sym = struct.unpack_from('<h', data, offset)[0]
-        offset += 2
-        code_length = struct.unpack_from('<H', data, offset)[0]
-        offset += 2
-        num_code_bytes = struct.unpack_from('<B', data, offset)[0]
-        offset += 1
-
-        code_bytes = data[offset:offset+num_code_bytes]
-        offset += num_code_bytes
-
-        # Convert code_bytes to a bitstring
-        bitstring = ''.join(bin(byte_val)[2:].zfill(8) for byte_val in code_bytes)
-        # Truncate to code_length bits
-        code_str = bitstring[:code_length]
-        symbol_to_code[sym] = code_str
-
-    # The rest is compressed bitstream
-    compressed_bitstream = data[offset:]
-
-    return block_size, pad, quant_step, nblocks, padding_bits, symbol_to_code, compressed_bitstream
-
-def build_code_to_symbol_map(symbol_to_code):
-    """Invert the symbol_to_code dictionary to code_to_symbol for decoding."""
-    code_to_symbol = {c: s for s, c in symbol_to_code.items()}
-    return code_to_symbol
-
-def bytes_to_bitstring(byte_data):
-    """Convert bytes to a bitstring."""
-    return ''.join(bin(byte_val)[2:].zfill(8) for byte_val in byte_data)
-
-def huffman_decode(bitstring, code_to_symbol, padding_bits):
-    """Decode the bitstring using the Huffman code_to_symbol map."""
-    # Remove padding bits from the end
-    if padding_bits > 0:
-        bitstring = bitstring[:-padding_bits]
-
-    decoded_symbols = []
-    current_code = ''
-    # Because we have a set of prefix-free codes, we can decode incrementally.
-    # To avoid excessive lookup complexity, store code_to_symbol keys in a set for quick checking.
-    code_prefixes = code_to_symbol.keys()
-
-    for bit in bitstring:
-        current_code += bit
-        if current_code in code_to_symbol:
-            decoded_symbols.append(code_to_symbol[current_code])
-            current_code = ''
-    return decoded_symbols
-
-def uniform_dequantize(qdata, step):
-    return qdata.astype(np.float64) * step
-
-if  __name__ == '__main__':
-    # Read compressed file and parse header
-    (block_size, pad, quant_step, nblocks, padding_bits, symbol_to_code, 
-     compressed_bitstream) = read_compressed('compressed')
-
-    # Invert Huffman table
-    code_to_symbol = build_code_to_symbol_map(symbol_to_code)
-
-    # Convert compressed data to a bitstring
-    bitstring = bytes_to_bitstring(compressed_bitstream)
-
-    # Huffman decode
-    quantized_list = huffman_decode(bitstring, code_to_symbol, padding_bits)
-    quantized_array = np.array(quantized_list, dtype=np.int16)
-    # Reshape to (nblocks, block_size)
-    quantized_blocks = quantized_array.reshape(nblocks, block_size)
-
-    # Dequantize
-    dct_blocks = uniform_dequantize(quantized_blocks, quant_step)
-
-    # Inverse DCT
-    time_blocks = idct(dct_blocks, type=2, norm='ortho', axis=1)
-
-    # Reassemble the full signal
-    reconstructed = time_blocks.flatten()
-
-    # Remove padding samples
-    if pad > 0:
-        reconstructed = reconstructed[:-pad]
-
-    # Convert back to 16-bit PCM
-    reconstructed = np.clip(reconstructed, -1.0, 1.0)
-    int_samples = (reconstructed * (2**15)).astype('<h')
-
-    # Write out.wav
-    # Using original parameters: 1 channel, 16-bit, 44100 Hz
-    with wave.open('out.wav', 'wb') as f:
-        f.setnchannels(1)
-        f.setsampwidth(2)
-        f.setframerate(44100)
-        f.writeframes(int_samples.tobytes())
-
-    print("Decompression complete. 'out.wav' created.")
+import struct, wave# Modules for handling binary data and WAV files
+import numpy as np# For numerical operations
+from scipy.fftpack import idct# For applying the inverse discrete cosine transform
+with open('compressed', 'rb') as f: d = f.read()# Read the compressed file
+o = 0# Initialize the offset
+bs, p = struct.unpack_from('<ii', d, o); o += 8# Extract block size and padding length (integers, 4 bytes each)
+q = struct.unpack_from('<d', d, o)[0]; o += 8
+n, pb, he = struct.unpack_from('<iii', d, o); o += 12# Extract number of blocks, padding bits, and number of Huffman entries (integers, 4 bytes each)
+stc = {}# Initialize the symbol-to-code mapping dictionary for Huffman decoding
+for _ in range(he):# Parse the Huffman table entries
+    s = struct.unpack_from('<h', d, o)[0]; o += 2# Read the symbol (2 bytes, signed integer)
+    cl = struct.unpack_from('<H', d, o)[0]; o += 2# Read the code length (2 bytes, unsigned short)
+    nb = struct.unpack_from('<B', d, o)[0]; o += 1# Read the number of bytes in the code (1 byte, unsigned char)
+    cb = d[o:o+nb]; o += nb# Read the actual code bytes
+    stc[s] = ''.join(bin(c)[2:].zfill(8) for c in cb)[:cl]# Convert code bytes to a binary string of specified length
+bitstring = ''.join(bin(c)[2:].zfill(8) for c in d[o:])# Convert the rest of the data to a binary string
+bitstring = bitstring[:-pb] if pb > 0 else bitstring# Remove padding bits if any
+cts = {v: k for k, v in stc.items()}# Create the code-to-symbol mapping for Huffman decoding
+decoded, code = [], ''# Initialize the decoded list and temporary code buffer
+for b in bitstring:
+    code += b# Append bit to the current code
+    if code in cts:# If the code is in the Huffman dictionary
+        decoded.append(cts[code])# Append the corresponding symbol to the decoded list
+        code = ''# Reset the code buffer
+qb = np.array(decoded, dtype=np.int16).reshape(n, bs)# Reshape the decoded data into blocks of size (n, bs)
+db = qb.astype(np.float64) * q# Multiply by the quantization step size to recover approximate values
+tb = idct(db, type=2, norm='ortho', axis=1).flatten()  # Flatten the transformed blocks into a single array
+if p > 0: tb = tb[:-p]# Remove padding samples if any
+samples = (np.clip(tb, -1.0, 1.0) * (2**15)).astype('<h')# Clip the reconstructed signal to the range [-1.0, 1.0] and convert to 16-bit PCM
+with wave.open('out.wav', 'wb') as f:# Write the reconstructed audio signal to an output WAV file
+    f.setnchannels(1)# Set to mono (1 channel)
+    f.setsampwidth(2)# Set sample width to 2 bytes (16-bit)
+    f.setframerate(44100)# Set sampling rate to 44100 Hz
+    f.writeframes(samples.tobytes())# Write the PCM samples to the file

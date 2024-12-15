@@ -18,7 +18,11 @@ size_bytes = os.path.getsize(compiled_path)
 
 # Optional: Convert size to a more readable format (e.g., KB, MB)
 def format_size(bytes_size):
-    return bytes_size
+    for unit in ['bytes', 'KB', 'MB', 'GB']:
+        if bytes_size < 1024.0:
+            return f"{bytes_size:.2f} {unit}"
+        bytes_size /= 1024.0
+    return f"{bytes_size:.2f} TB"
 
 formatted_size = format_size(size_bytes)
 

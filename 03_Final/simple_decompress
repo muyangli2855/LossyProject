@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+
+import struct,wave,numpy as np
+from scipy.fftpack import idct
+
+f=open('compressed','rb');d=f.read();f.close()
+o=0
+bs=struct.unpack_from('<i',d,o)[0];o+=4
+p=struct.unpack_from('<i',d,o)[0];o+=4
+qs=struct.unpack_from('<d',d,o)[0];o+=8
+nb=struct.unpack_from('<i',d,o)[0];o+=4
+pb=struct.unpack_from('<i',d,o)[0];o+=4
+he=struct.unpack_from('<i',d,o)[0];o+=4
+stc={}
+for _ in range(he):
+    s=struct.unpack_from('<h',d,o)[0];o+=2
+    cl=struct.unpack_from('<H',d,o)[0];o+=2
+    ncb=struct.unpack_from('<B',d,o)[0];o+=1
+    cb=d[o:o+ncb];o+=ncb
+    bstr=''.join(bin(x)[2:].zfill(8)for x in cb)[:cl]
+    stc[s]=bstr
+cts={v:k for k,v in stc.items()}
+cbs=d[o:]
+bits=''.join(bin(x)[2:].zfill(8)for x in cbs)
+if pb>0:bits=bits[:-pb]
+res=[]
+cc=''
+for b in bits:
+    cc+=b
+    if cc in cts:
+        res.append(cts[cc])
+        cc=''
+arr=np.array(res,dtype=np.int16).reshape(nb,bs)
+arr=(arr.astype(np.float64)*qs)
+tb=idct(arr,type=2,norm='ortho',axis=1).ravel()
+if p>0:tb=tb[:-p]
+tb=np.clip(tb,-1,1)
+isam=(tb*(2**15)).astype('<h')
+w=wave.open('out.wav','wb')
+w.setnchannels(1)
+w.setsampwidth(2)
+w.setframerate(44100)
+w.writeframes(isam.tobytes())
+w.close()
