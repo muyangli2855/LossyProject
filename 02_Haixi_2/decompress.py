@@ -1,3 +1,4 @@
+# decompress.py
 #!/usr/bin/env python
 
 import struct
@@ -91,7 +92,7 @@ def huffman_decode(bitstring, code_to_symbol, padding_bits):
 def uniform_dequantize(qdata, step):
     return qdata.astype(np.float64) * step
 
-if __name__ == "__main__":
+if  __name__ == '__main__':
     # Read compressed file and parse header
     (block_size, pad, quant_step, nblocks, padding_bits, symbol_to_code, 
      compressed_bitstream) = read_compressed('compressed')

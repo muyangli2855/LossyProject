@@ -10,7 +10,7 @@ import scipy as sp
 # Open the input and output files. 'wb' is needed on some platforms
 # to indicate that 'compressed' is a binary file.
 
-def computemse():
+if __name__ == '__main__':
     fin = wave.open('../step.wav','r')
     (nchannels, sampwidth, framerate, nframes, comptype, compname) = fin.getparams()
     inbytes = fin.readframes(nframes)
@@ -32,5 +32,5 @@ def computemse():
     samples2 = np.array(samplesfloat)
 
     dimens = samples1.shape
-    # print('MSE: {}'.format(sum((samples1 - samples2)**2)/dimens[0]))
-    return sum((samples1 - samples2)**2)/dimens[0]
+    print('MSE: {}'.format(sum((samples1 - samples2)**2)/dimens[0]))
+

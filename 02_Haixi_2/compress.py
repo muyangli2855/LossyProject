@@ -1,5 +1,5 @@
+# Compress.py
 #!/usr/bin/env python3
-
 import wave
 import struct
 import numpy as np
@@ -113,14 +113,10 @@ def bitstring_to_bytes(bitstring):
 # =============================================================================
 # Main Compression Steps
 # =============================================================================
-
 if __name__ == "__main__":
-    # Parameters - adjust as needed
-    block_size = 1240
-    quant_step = 0.0382  # Tune this for desired quality and file size
-
+    block_size, quant_step = 1290, 0.03833
     # Read the input wav
-    samples, params = read_wav('step.wav')
+    samples, params = read_wav('../step.wav')
     # Partition into blocks
     blocks, pad = block_partition(samples, block_size)
 
@@ -188,4 +184,4 @@ if __name__ == "__main__":
         f.write(header)
         f.write(compressed_data)
 
-    print("Compression complete. 'compressed' file created.")
+    print("The compression complete. 'compressed' file created.")

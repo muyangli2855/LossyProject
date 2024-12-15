@@ -27,8 +27,8 @@ def find_best_blocksize_and_quantstep():
     mse_threshold = 4e-5  # MSE 阈值
 
     # 遍历 blocksize
-    for blocksize in range(1088, 1281):  # 从 1088 到 1280 遍历
-        quant_step = 0.03823  # 从 0.03800 开始
+    for blocksize in range(1100, 1300):  # 从 1088 到 1280 遍历
+        quant_step = 0.040  # 从 0.03800 开始
         previous_size = None
         previous_quant_step = None
 
@@ -56,7 +56,7 @@ def find_best_blocksize_and_quantstep():
             previous_quant_step = quant_step
 
             # 增加 quant_step
-            quant_step += 0.00001
+            quant_step += 0.05
 
         # 防止循环陷入无限
         quant_step = round(quant_step, 5)  # 避免浮点数误差
@@ -65,11 +65,7 @@ def find_best_blocksize_and_quantstep():
 
 if __name__ == "__main__":
     # 调用函数并输出结果
-    # best_blocksize, best_quant_step, min_size = find_best_blocksize_and_quantstep()
-    # print(f"最佳组合: blocksize={best_blocksize}, quant_step={best_quant_step}, size={min_size}")
+    #best_blocksize, best_quant_step, min_size = find_best_blocksize_and_quantstep()
+    #print(f"最佳组合: blocksize={best_blocksize}, quant_step={best_quant_step}, size={min_size}")
     # 最佳组合: blocksize=1240, quant_step=0.03823, size=74048
-
-    # getSizeAndMse(1240, 0.03823)
-
-    compress.compress(1240, 0.03823)
-    decompress.decompress()
+    getSizeAndMse(1240, 0.038)
